@@ -1,7 +1,15 @@
 import discord
 from discord.ext import commands
 import yt_dlp
+import json
 
+def read_token(filename='config.json'):
+    with open(filename, 'r') as file:
+        config = json.load(file)
+    return config
+
+config_data = read_token()
+bot_token = config_data.get('bot_token','1')
 
 
 intents = discord.Intents.default()
@@ -42,4 +50,4 @@ async def play(ctx, url):
     voice_channel.source = discord.PCMVolumeTransformer(voice_channel.source)
     voice_channel.source.volume = 0.07
 # Запускаем бота
-bot.run('MTE4NjMyMDg5MzMxNjY5NDA3Nw.Gbj8cC.SBtjX8GG2Cvc9UXxUgGJ1wBivv0fafpGy4jpwM')
+bot.run(bot_token)
