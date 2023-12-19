@@ -41,6 +41,7 @@ async def play(ctx, url):
         await voice_channel.disconnect()
         await channel.connect()
 
+    global queue
     queue.append(url)
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
 
@@ -48,6 +49,7 @@ async def play(ctx, url):
         await next(ctx)
  
 async def next(ctx):
+    global queue
     if queue:
         ydl = yt_dlp.YoutubeDL({
             'format': 'bestaudio/best',
@@ -77,6 +79,7 @@ async def next(ctx):
                 await next(ctx)
         except IndexError:
             return
+
 @bot.command()
 async def skip(ctx):
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
@@ -86,11 +89,13 @@ async def skip(ctx):
     elif not voice_channel.is_playing():
         await('Ничего не играет')
         return
-
     voice_channel.stop()
-
     await next(ctx)
 
+@bot.command()
+async def clean(ctx):
+    global queue
+    queue = []
 
 #Запускаем бота
 bot.run(bot_token)
