@@ -65,10 +65,13 @@ async def next(ctx):
         url = queue.pop(0)
         info = ydl.extract_info(url, download=False)
         url2 = info['url']
-	          
+        #Достаем название ссылки и пишем в чате
+        video_title = info['title']
+        await ctx.send(f'Играет: {video_title}')
+        
         voice_channel.play(discord.FFmpegPCMAudio(url2, **ffmpeg_options), after=lambda e: print('done', e))
         voice_channel.source = discord.PCMVolumeTransformer(voice_channel.source)
-        voice_channel.source.volume = 0.07
+        voice_channel.source.volume = 0.11
 
         #Ждем пока играет
         while voice_channel.is_playing():
@@ -78,8 +81,9 @@ async def next(ctx):
             if queue[0] is not None:
                 await next(ctx)
         except IndexError:
-            return
-
+            bot.loop.create_task(check_playing_music(ctx))            
+            
+        
 @bot.command()
 async def skip(ctx):
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
@@ -87,7 +91,7 @@ async def skip(ctx):
         await ctx.send('Я не там где нужно')
         return
     elif not voice_channel.is_playing():
-        await('Ничего не играет')
+        await ctx.send('Ничего не играет')
         return
     voice_channel.stop()
     await next(ctx)
@@ -96,6 +100,16 @@ async def skip(ctx):
 async def clean(ctx):
     global queue
     queue = []
+
+async def check_playing_music(ctx):
+    await asyncio.sleep(300)
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_channel.is_playing():
+        return
+    else:
+        await voice_channel.disconnect()
+        await ctx.send(f'Нет друзей...')
+        print(f'Нет друзей...')
 
 #Запускаем бота
 bot.run(bot_token)
