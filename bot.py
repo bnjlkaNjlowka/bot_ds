@@ -3,6 +3,8 @@ from discord.ext import commands
 import yt_dlp
 import json
 import asyncio
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 #Чтение токена
 def read_token(filename='config.json'):
@@ -12,6 +14,9 @@ def read_token(filename='config.json'):
 
 config_data = read_token()
 bot_token = config_data.get('bot_token','1')
+SPOTIPY_CLIENT_ID = config_data.get('spotify_client_id','1')
+SPOTIPY_CLIENT_SECRET = config_data.get('spotify_client_secret', '1')
+sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIPY_CLIENT_ID, client_secret=SPOTIPY_CLIENT_SECRET))
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -19,6 +24,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 #Пустой список для очереди
 queue = []
+loop_on = False
 
 ffmpeg_options = {
                 'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
@@ -68,10 +74,9 @@ async def next(ctx):
         #Достаем название ссылки и пишем в чате
         video_title = info['title']
         await ctx.send(f'Играет: {video_title}')
+        print(url2)
         
-        voice_channel.play(discord.FFmpegPCMAudio(url2, **ffmpeg_options), after=lambda e: print('done', e))
-        voice_channel.source = discord.PCMVolumeTransformer(voice_channel.source)
-        voice_channel.source.volume = 0.11
+        voice_channel.play(discord.FFmpegPCMAudio(url2, **ffmpeg_options), after=lambda e: for_loop(ctx,url2))
 
         #Ждем пока играет
         while voice_channel.is_playing():
@@ -110,6 +115,59 @@ async def check_playing_music(ctx):
         await voice_channel.disconnect()
         await ctx.send(f'Нет друзей...')
         print(f'Нет друзей...')
+
+def for_loop(ctx, url):
+    global loop_on
+    if loop_on:
+        voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx,url))
+    else:
+        bot.loop.create_task(check_playing_music(ctx))            
+
+@bot.command()
+async def loop(ctx):
+    global loop_on
+    loop_on = not loop_on
+    await ctx.send(f'Повтор трека {"вкл" if loop_on else "выкл"}')
+
+@bot.command()
+async def search(ctx, *, name_song):
+    channel = ctx.author.voice.channel
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    
+    ydl = yt_dlp.YoutubeDL({
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+	    'key': 'FFmpegExtractAudio',
+	    'preferredcodec': 'mp3',
+        'preferredquality': '192',
+	    }],
+        'noplaylist': True,
+    })
+    search_results = ydl.extract_info(f'ytsearch5:{name_song}', download = False)['entries']
+
+    if not search_results:
+        await ctx.send('Ничего нет по запросу')
+        return
+    print(search_results[0]['webpage_url'])
+    options = [f"{i+1}. {result['title']}" for i, result in enumerate(search_results)]
+    options_message = "\n".join(options)
+
+    await ctx.send(f"Выбрать:\n{options_message}")
+    
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and message.content.isdigit() and 1 <= int(message.content) <= 5
+
+    try:
+        response = await bot.wait_for('message', check=check, timeout=30)
+        selected_index = int(response.content) - 1
+        selected_video = search_results[selected_index]
+        video_url = selected_video['webpage_url']
+    except (ValueError, IndexError, asyncio.TimeoutError):
+        await ctx.send("Поздно или не то")
+        return
+
+    await play(ctx,video_url)
 
 #Запускаем бота
 bot.run(bot_token)
