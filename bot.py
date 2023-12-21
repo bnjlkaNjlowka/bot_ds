@@ -169,5 +169,32 @@ async def search(ctx, *, name_song):
 
     await play(ctx,video_url)
 
+@bot.command()
+async def splay(ctx, url):
+    name_track = sp.track(url)['name']
+    name_artist = sp.track(url)['artists'][0]['name']
+    name_song = str(name_track + ' ' + name_artist)
+    await search_song(ctx, name_song = name_song)
+
+async def search_song(ctx, *, name_song):
+    channel = ctx.author.voice.channel
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    
+    ydl = yt_dlp.YoutubeDL({
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+	    'key': 'FFmpegExtractAudio',
+	    'preferredcodec': 'mp3',
+        'preferredquality': '192',
+	    }],
+        'noplaylist': True,
+    })
+    search_video = ydl.extract_info(f'ytsearch1:{name_song}', download = False)['entries']
+    video_url = search_video[0]['webpage_url']
+
+    await play(ctx,video_url)
+
+
+
 #Запускаем бота
 bot.run(bot_token)
