@@ -192,7 +192,6 @@ async def search(ctx, *, name_song):
 
     await play(ctx,video_url)
 
-@bot.command()
 async def splay(ctx, url):
     name_track = sp.track(url)['name']
     name_artist = sp.track(url)['artists'][0]['name']
@@ -218,7 +217,6 @@ async def search_song(ctx, *, name_song):
     
     queue.append(video_url)
 
-@bot.command()
 async def saplay(ctx, url):
     album_info = sp.album_tracks(url)
     urls_from_album_info = album_info['items'][0]['external_urls']['spotify']
