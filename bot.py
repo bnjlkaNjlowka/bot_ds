@@ -47,12 +47,27 @@ async def play(ctx, url):
         await voice_channel.disconnect()
         await channel.connect()
 
-    global queue
-    queue.append(url)
-    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    ydl = yt_dlp.YoutubeDL({
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+		'key': 'FFmpegExtractAudio',
+		'preferredcodec': 'mp3',
+		'preferredquality': '192',
+		}],
+	})
 
+    global queue
+    
+    info = ydl.extract_info(url, download=False)
+    try:
+        for urls in info['entries']:
+            queue.append(urls['webpage_url'])
+    except KeyError:
+        queue.append(url)
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if not voice_channel.is_playing(): #Если он ничего не играет
         await next(ctx)
+        return
  
 async def next(ctx):
     global queue
@@ -74,7 +89,6 @@ async def next(ctx):
         #Достаем название ссылки и пишем в чате
         video_title = info['title']
         await ctx.send(f'Играет: {video_title}')
-        print(url2)
         
         voice_channel.play(discord.FFmpegPCMAudio(url2, **ffmpeg_options), after=lambda e: for_loop(ctx,url2))
 
@@ -99,7 +113,7 @@ async def skip(ctx):
         await ctx.send('Ничего не играет')
         return
     voice_channel.stop()
-    await next(ctx)
+    #await next(ctx)
 
 @bot.command()
 async def clean(ctx):
