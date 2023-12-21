@@ -58,7 +58,16 @@ async def play(ctx, url):
 
     global queue
     
-    info = ydl.extract_info(url, download=False)
+    try:
+        info = ydl.extract_info(url, download=False)
+    except yt_dlp.utils.DownloadError:
+        try:
+            await splay(ctx, url = url)
+            return
+        except spotipy.exceptions.SpotifyException:
+            await saplay(ctx, url = url)
+            return
+
     try:
         for urls in info['entries']:
             queue.append(urls['webpage_url'])
@@ -191,6 +200,7 @@ async def splay(ctx, url):
     await search_song(ctx, name_song = name_song)
 
 async def search_song(ctx, *, name_song):
+    global queue
     channel = ctx.author.voice.channel
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     
@@ -205,10 +215,22 @@ async def search_song(ctx, *, name_song):
     })
     search_video = ydl.extract_info(f'ytsearch1:{name_song}', download = False)['entries']
     video_url = search_video[0]['webpage_url']
+    
+    queue.append(video_url)
 
-    await play(ctx,video_url)
-
-
+@bot.command()
+async def saplay(ctx, url):
+    album_info = sp.album_tracks(url)
+    urls_from_album_info = album_info['items'][0]['external_urls']['spotify']
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    for url in album_info['items']:
+        #print(url['external_urls']['spotify'])
+        await splay(ctx, url = url['external_urls']['spotify'])
+    if not voice_channel.is_playing(): #Если он ничего не играет
+       await next(ctx)
+       return
+    
+    #print(urls_from_album_info)
 
 #Запускаем бота
 bot.run(bot_token)
