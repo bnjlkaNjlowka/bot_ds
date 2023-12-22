@@ -125,6 +125,7 @@ async def skip(ctx):
 async def clean(ctx):
     global queue
     queue = []
+    names_video = []
 
 async def check_playing_music(ctx):
     await asyncio.sleep(300)
