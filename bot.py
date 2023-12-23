@@ -47,7 +47,7 @@ ydl = yt_dlp.YoutubeDL(ydl_opts)
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
-@bot.command()
+
 async def connect(ctx):
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     channel = ctx.author.voice.channel
@@ -59,7 +59,6 @@ async def connect(ctx):
 
 @bot.command()
 async def play(ctx, url):
-    global queue
     global ydl  
     
     await get_url(ctx, url = url)
@@ -71,24 +70,30 @@ async def play(ctx, url):
 
 async def get_url(ctx, url):
     global ydl
-    try:
-        info = ydl.extract_info(url, download=False)
-        try:
+    global queue
+    global names_video
+    if str(url).find('youtube') != -1:
+        if str(url).find('playlist') != -1:
+            info = ydl.extract_info(url, download=False)
             for urls in info['entries']:
                 queue.append(urls['url'])
                 names_video.append(urls['title'])
-        except KeyError:
+        elif str(url).find('watch') != -1:
+            info = ydl.extract_info(url, download=False)
             queue.append(info['url'])
             names_video.append(info['title'])
-    except yt_dlp.utils.DownloadError:
-        try:
+    elif str(url).find('open.spotify') != -1:
+        if str(url).find('track') != -1:
             await splay(ctx, url = url)
-        except spotipy.exceptions.SpotifyException:
+        elif str(url).find('album') != -1:
             await saplay(ctx, url = url)
+    else:
+        await ctx.send('Ссылка невалидна. Только YouTube, Spotify.')
 
 async def next(ctx):
     global queue
     global ydl
+    global names_video
 
     if queue: 
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
@@ -119,11 +124,11 @@ async def skip(ctx):
         await ctx.send('Ничего не играет')
         return
     voice_channel.stop()
-    #await next(ctx)
 
 @bot.command()
 async def clean(ctx):
     global queue
+    global names_video
     queue = []
     names_video = []
 
@@ -161,14 +166,14 @@ async def search(ctx, *, name_song):
     if not search_results:
         await ctx.send('Ничего нет по запросу')
         return
-    print(search_results[0]['webpage_url'])
     options = [f"{i+1}. {result['title']}" for i, result in enumerate(search_results)]
     options_message = "\n".join(options)
 
     await ctx.send(f"Выбрать:\n{options_message}")
     
     def check(message):
-        return message.author == ctx.author and message.channel == ctx.channel and message.content.isdigit() and 1 <= int(message.content) <= 5
+        int(message.content)
+        return message.author == ctx.author and message.channel == ctx.channel and message.content.isdigit() 
 
     try:
         response = await bot.wait_for('message', check=check, timeout=30)
@@ -179,8 +184,9 @@ async def search(ctx, *, name_song):
         queue.append(video_url)
         names_video.append(name_video)
         await connect(ctx)
+        voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     except (ValueError, IndexError, asyncio.TimeoutError):
-        await ctx.send("Поздно или не то")
+        await ctx.send("Невалидный ответ. Необходимо ввести цифру 1 - 5. Вводите заново !search 'запрос'.")
         return
     if not voice_channel.is_playing():
         await next(ctx)
@@ -188,21 +194,22 @@ async def search(ctx, *, name_song):
 
 
 async def splay(ctx, url):
+    global names_video
     name_track = sp.track(url)['name']
     name_artist = sp.track(url)['artists'][0]['name']
     name_song = str(name_track + ' ' + name_artist)
+    names_video.append(name_song)
     await search_song(ctx, name_song = name_song)
 
 async def search_song(ctx, *, name_song):
     global queue
     global ydl
+    global names_video
     channel = ctx.author.voice.channel
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     search_video = ydl.extract_info(f'ytsearch1:{name_song}', download = False)['entries']
     video_url = search_video[0]['url']
-    name_video = search_video[0]['title']
     queue.append(video_url)
-    names_video.append(name_video)
 
 async def saplay(ctx, url):
     album_info = sp.album_tracks(url)
