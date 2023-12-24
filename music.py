@@ -13,15 +13,10 @@ def read_token(filename='config.json'):
     return config
 
 config_data = read_token()
-bot_token = config_data.get('bot_token','1')
 SPOTIPY_CLIENT_ID = config_data.get('spotify_client_id','1')
 SPOTIPY_CLIENT_SECRET = config_data.get('spotify_client_secret', '1')
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIPY_CLIENT_ID, client_secret=SPOTIPY_CLIENT_SECRET))
 
-intents = discord.Intents.default()
-intents.message_content = True
-
-bot = commands.Bot(command_prefix='!', intents=intents)
 #Пустой список для очереди
 queue = []
 names_video = []
@@ -31,6 +26,7 @@ ffmpeg_options = {
                 'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
                 'options': '-vn',
                 }
+
 ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -40,15 +36,9 @@ ydl_opts = {
 		}],
 	}
 
-
 ydl = yt_dlp.YoutubeDL(ydl_opts)
 
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user.name}')
-
-async def connect(ctx):
+async def connect(ctx, bot):
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     channel = ctx.author.voice.channel
     if voice_channel is None: #Бота нет ни в одном канале
@@ -57,18 +47,16 @@ async def connect(ctx):
         await voice_channel.disconnect()
         await channel.connect()
 
-@bot.command()
-async def play(ctx, url):
-    global ydl  
-    
-    await get_url(ctx, url = url)
-    await connect(ctx)
+async def play(ctx, url, bot):
+    global ydl      
+    await connect(ctx, bot = bot)
+    await get_url(ctx, url = url, bot = bot)
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if not voice_channel.is_playing(): #Если он ничего не играет
-        await next(ctx)
+        await next(ctx, bot = bot)
         return
 
-async def get_url(ctx, url):
+async def get_url(ctx, url, bot):
     global ydl
     global queue
     global names_video
@@ -84,17 +72,16 @@ async def get_url(ctx, url):
             names_video.append(info['title'])
     elif str(url).find('open.spotify') != -1:
         if str(url).find('track') != -1:
-            await splay(ctx, url = url)
+            await splay(ctx, url = url, bot = bot)
         elif str(url).find('album') != -1:
-            await saplay(ctx, url = url)
+            await saplay(ctx, url = url, bot = bot)
     else:
         await ctx.send('Ссылка невалидна. Только YouTube, Spotify.')
 
-async def next(ctx):
+async def next(ctx, bot):
     global queue
     global ydl
     global names_video
-
     if queue: 
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
         # Используем yt-dlp для получения музыкальной информации
@@ -102,37 +89,24 @@ async def next(ctx):
         #Достаем название ссылки и пишем в чате
         video_title = names_video.pop(0)
         await ctx.send(f'Играет: {video_title}')
-        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx,url))
+        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx, url = url, bot = bot))
         #Ждем пока играет
         while voice_channel.is_playing():
             await asyncio.sleep(1)
         #Запускает следующее в очереди
         try:
             if queue[0] is not None:
-                await next(ctx)
+                await next(ctx, bot = bot)
         except IndexError:
-            bot.loop.create_task(check_playing_music(ctx))            
-            
-        
-@bot.command()
-async def skip(ctx):
-    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_channel is None:
-        await ctx.send('Я не там где нужно')
-        return
-    elif not voice_channel.is_playing():
-        await ctx.send('Ничего не играет')
-        return
-    voice_channel.stop()
-
-@bot.command()
+            bot.loop.create_task(check_playing_music(ctx, bot))            
+ 
 async def clean(ctx):
     global queue
     global names_video
     queue = []
     names_video = []
 
-async def check_playing_music(ctx):
+async def check_playing_music(ctx, bot):
     await asyncio.sleep(300)
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_channel.is_playing():
@@ -142,34 +116,29 @@ async def check_playing_music(ctx):
         await ctx.send(f'Нет друзей...')
         print(f'Нет друзей...')
 
-def for_loop(ctx, url):
+def for_loop(ctx, url, bot):
     global loop_on
     if loop_on:
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx,url))
+        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx, url=url, bot = bot))
     else:
-        bot.loop.create_task(check_playing_music(ctx))            
+        bot.loop.create_task(check_playing_music(ctx, bot = bot)) 
 
-@bot.command()
 async def loop(ctx):
     global loop_on
     loop_on = not loop_on
     await ctx.send(f'Повтор трека {"вкл" if loop_on else "выкл"}')
 
-@bot.command()
-async def search(ctx, *, name_song):
+async def search(ctx, *, name_song, bot):
     channel = ctx.author.voice.channel
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-     
     search_results = ydl.extract_info(f'ytsearch5:{name_song}', download = False)['entries']
-
     if not search_results:
         await ctx.send('Ничего нет по запросу')
         return
     options = [f"{i+1}. {result['title']}" for i, result in enumerate(search_results)]
     options_message = "\n".join(options)
-
-    await ctx.send(f"Выбрать:\n{options_message}")
+    await ctx.send(f"(Необходимо просто ввести цифру 1 - 5)\nВыбрать:\n{options_message}")
     
     def check(message):
         int(message.content)
@@ -183,25 +152,24 @@ async def search(ctx, *, name_song):
         name_video = selected_video['title']
         queue.append(video_url)
         names_video.append(name_video)
-        await connect(ctx)
+        await connect(ctx, bot = bot)
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     except (ValueError, IndexError, asyncio.TimeoutError):
         await ctx.send("Невалидный ответ. Необходимо ввести цифру 1 - 5. Вводите заново !search 'запрос'.")
         return
     if not voice_channel.is_playing():
-        await next(ctx)
+        await next(ctx, bot = bot)
         return
 
-
-async def splay(ctx, url):
+async def splay(ctx, url, bot):
     global names_video
     name_track = sp.track(url)['name']
     name_artist = sp.track(url)['artists'][0]['name']
     name_song = str(name_track + ' ' + name_artist)
     names_video.append(name_song)
-    await search_song(ctx, name_song = name_song)
+    await search_song(ctx, name_song = name_song, bot = bot)
 
-async def search_song(ctx, *, name_song):
+async def search_song(ctx, *, name_song, bot):
     global queue
     global ydl
     global names_video
@@ -211,15 +179,13 @@ async def search_song(ctx, *, name_song):
     video_url = search_video[0]['url']
     queue.append(video_url)
 
-async def saplay(ctx, url):
+async def saplay(ctx, url, bot):
     album_info = sp.album_tracks(url)
     urls_from_album_info = album_info['items'][0]['external_urls']['spotify']
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     for url in album_info['items']:
-        await splay(ctx, url = url['external_urls']['spotify'])
+        await splay(ctx, url = url['external_urls']['spotify'], bot = bot)
     if not voice_channel.is_playing(): #Если он ничего не играет
-        await next(ctx)
+        await next(ctx, bot = bot)
         return
 
-#Запускаем бота
-bot.run(bot_token)
