@@ -48,7 +48,7 @@ async def search(ctx, *, name_song):
 
 @bot.command()
 async def loop(ctx):
-    await music.loop(ctx)
+    await music.loop(ctx, bot = bot)
 
 @bot.command()
 async def button(ctx):
