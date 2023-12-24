@@ -3,6 +3,7 @@ from discord.ext import commands
 import json
 import utils
 import music
+import gui
 
 def read_token(filename='config.json'):
     with open(filename, 'r') as file:
@@ -48,5 +49,10 @@ async def search(ctx, *, name_song):
 @bot.command()
 async def loop(ctx):
     await music.loop(ctx)
+
+@bot.command()
+async def button(ctx):
+    await gui.button(ctx, bot = bot) 
+
 bot.run(bot_token)
 

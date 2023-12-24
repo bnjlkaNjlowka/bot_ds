@@ -5,6 +5,7 @@ import json
 import asyncio
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+import gui
 
 #Чтение токена
 def read_token(filename='config.json'):
@@ -88,10 +89,12 @@ async def next(ctx, bot):
         url = queue.pop(0)
         #Достаем название ссылки и пишем в чате
         video_title = names_video.pop(0)
-        await ctx.send(f'Играет: {video_title}')
-        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx, url = url, bot = bot))
+        #await ctx.send(f'Играет: {video_title}')
+        await ctx.send(f'Играет: {video_title}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title))
+
+        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after = lambda e: for_loop(ctx, url = url, bot = bot))
         #Ждем пока играет
-        while voice_channel.is_playing():
+        while voice_channel.is_playing() or voice_channel.is_paused():
             await asyncio.sleep(1)
         #Запускает следующее в очереди
         try:
@@ -99,7 +102,7 @@ async def next(ctx, bot):
                 await next(ctx, bot = bot)
         except IndexError:
             bot.loop.create_task(check_playing_music(ctx, bot))            
- 
+
 async def clean(ctx):
     global queue
     global names_video
@@ -120,7 +123,7 @@ def for_loop(ctx, url, bot):
     global loop_on
     if loop_on:
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after=lambda e: for_loop(ctx, url=url, bot = bot))
+        voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after = lambda e: for_loop(ctx, url=url, bot = bot))
     else:
         bot.loop.create_task(check_playing_music(ctx, bot = bot)) 
 
