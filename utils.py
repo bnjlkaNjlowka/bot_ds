@@ -25,5 +25,3 @@ async def skip(ctx, bot):
         await ctx.send('Ничего не играет')
         return
     voice_channel.stop()
-
-

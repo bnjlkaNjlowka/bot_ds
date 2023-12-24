@@ -50,6 +50,7 @@ async def connect(ctx, bot):
 
 async def play(ctx, url, bot):
     global ydl      
+    await ctx.message.delete()
     await connect(ctx, bot = bot)
     await get_url(ctx, url = url, bot = bot)
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
@@ -79,19 +80,30 @@ async def get_url(ctx, url, bot):
     else:
         await ctx.send('Ссылка невалидна. Только YouTube, Spotify.')
 
+async def send_message(ctx, bot, name_video):
+    global id_message
+    video_title = name_video
+    try:
+        if id_message is not None:
+            new_message = await ctx.channel.fetch_message(id_message)
+            await new_message.edit(content = f'Играет: {video_title}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title))
+    except Exception:
+        message = await ctx.send(f'Играет: {video_title}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title))
+        id_message = message.id     
+        
+
 async def next(ctx, bot):
     global queue
     global ydl
     global names_video
+    global video_title
     if queue: 
         voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
         # Используем yt-dlp для получения музыкальной информации
         url = queue.pop(0)
         #Достаем название ссылки и пишем в чате
         video_title = names_video.pop(0)
-        #await ctx.send(f'Играет: {video_title}')
-        await ctx.send(f'Играет: {video_title}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title))
-
+        await send_message(ctx, bot = bot, name_video = video_title)
         voice_channel.play(discord.FFmpegPCMAudio(url, **ffmpeg_options), after = lambda e: for_loop(ctx, url = url, bot = bot))
         #Ждем пока играет
         while voice_channel.is_playing() or voice_channel.is_paused():
@@ -109,13 +121,19 @@ async def clean(ctx):
     queue = []
     names_video = []
 
+async def delete_message(ctx):
+    global id_message
+    new_message = await ctx.channel.fetch_message(id_message)
+    await new_message.delete() 
+
 async def check_playing_music(ctx, bot):
-    await asyncio.sleep(300)
+    await asyncio.sleep(10)
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice_channel.is_playing():
         return
     else:
         await voice_channel.disconnect()
+        await delete_message(ctx)
         await ctx.send(f'Нет друзей...')
         print(f'Нет друзей...')
 
@@ -127,10 +145,13 @@ def for_loop(ctx, url, bot):
     else:
         bot.loop.create_task(check_playing_music(ctx, bot = bot)) 
 
-async def loop(ctx):
+async def loop(ctx, bot):
+    global id_message
     global loop_on
+    global video_title
     loop_on = not loop_on
-    await ctx.send(f'Повтор трека {"вкл" if loop_on else "выкл"}')
+    new_message = await ctx.channel.fetch_message(id_message)
+    await new_message.edit(content = f'Играет: {video_title} {"Повтор трека вкл" if loop_on else ""}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title)) 
 
 async def search(ctx, *, name_song, bot):
     channel = ctx.author.voice.channel

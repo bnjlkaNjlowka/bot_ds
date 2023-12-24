@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import utils
+import music
 
 class Button(discord.ui.View):
     def __init__(self, ctx, bot, name_video):
@@ -17,11 +18,15 @@ class Button(discord.ui.View):
     async def resume_button(self, interaction: discord.Interaction, Button: discord.ui.Button):
         await interaction.response.edit_message(content = f'Играет: {self.name_video}')
         await utils.resume(ctx = self.ctx, bot = self.bot)
-    #@discord.ui.button(label = 'Следующий')
-    #async def next_button(self, interaction: discord.Interaction, Button: discord.ui.Button):
-    #    await interaction.response.edit_message(content =f'Играет {self.name_video}')
-    #    await utils.skip(ctx = self.ctx, bot = self.bot)
-
+    @discord.ui.button(label = 'Следующий')
+    async def next_button(self, interaction: discord.Interaction, Button: discord.ui.Button):
+        await interaction.response.defer()
+        await utils.skip(ctx = self.ctx, bot = self.bot)
+    @discord.ui.button(label = 'Повтор')
+    async def loop_button(self, interaction: discord.Interaction, Button: discord.ui.Button):
+        await interaction.response.defer()
+        await music.loop(ctx = self.ctx, bot = self.bot)
+    
 async def button(ctx, bot):
     await ctx.send(view = Button(ctx = ctx, bot = bot))
     #await utils.pause(ctx, bot = bot)
