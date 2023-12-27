@@ -91,6 +91,20 @@ async def send_message(ctx, bot, name_video):
         message = await ctx.send(f'Играет: {video_title}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title))
         id_message = message.id     
         
+async def for_next(ctx, url, name_song, bot):
+    global queue
+    global names_video
+    global id_message_for_next
+    queue.append(url)
+    names_video.append(name_song)
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice_channel is None:
+        await connect(ctx, bot)
+    message = await ctx.channel.fetch_message(id_message_for_next)
+    await message.delete()
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if not voice_channel.is_playing():
+        await next(ctx, bot)
 
 async def next(ctx, bot):
     global queue
@@ -153,7 +167,19 @@ async def loop(ctx, bot):
     new_message = await ctx.channel.fetch_message(id_message)
     await new_message.edit(content = f'Играет: {video_title} {"Повтор трека вкл" if loop_on else ""}', view = gui.Button(ctx = ctx, bot = bot, name_video = video_title)) 
 
+
 async def search(ctx, *, name_song, bot):
+    global id_message_for_next
+    channel = ctx.author.voice.channel
+    voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    search_results = ydl.extract_info(f'ytsearch5:{name_song}', download = False)['entries']
+    if not search_results:
+        await ctx.send('Ничего нет по запросу')
+        return
+    await ctx.message.delete()
+    message = await ctx.send(view = gui.SelectMenuView(search_results = search_results, ctx = ctx, bot = bot))
+    id_message_for_next = message.id 
+async def old_search(ctx, *, name_song, bot):
     channel = ctx.author.voice.channel
     voice_channel = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     search_results = ydl.extract_info(f'ytsearch5:{name_song}', download = False)['entries']
@@ -212,4 +238,3 @@ async def saplay(ctx, url, bot):
     if not voice_channel.is_playing(): #Если он ничего не играет
         await next(ctx, bot = bot)
         return
-

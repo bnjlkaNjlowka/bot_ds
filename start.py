@@ -51,8 +51,7 @@ async def loop(ctx):
     await music.loop(ctx, bot = bot)
 
 @bot.command()
-async def button(ctx):
+async def menu(ctx):
     await gui.button(ctx, bot = bot) 
 
 bot.run(bot_token)
-
